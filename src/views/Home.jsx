@@ -9,6 +9,11 @@ export default function Home() {
   const [view, setView] = useState(null);
   const [users, setUsers] = useState([]);
 
+  const [question, setQuestion] = useState("");
+  const [askLoading, setAskLoading] = useState(false);
+  const [askError, setAskError] = useState(null);
+  const [askResult, setAskResult] = useState(null);
+
   const fetchUsers = async () => {
     try {
       const res = await axios.get(apiBase);
@@ -21,6 +26,35 @@ export default function Home() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const askAi = async (e) => {
+    e.preventDefault();
+    const q = String(question || "").trim();
+
+    if (!q) return;
+
+    setAskLoading(true);
+    setAskError(null);
+    setAskResult(null);
+
+    try {
+      const response = await axios.post(
+        `${apiBase}`,
+        { question: q, topK: 5 },
+        { withCredentials: true }
+      );
+      setAskResult(response.data.data || null);
+    } catch (error) {
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.response?.data?.details ||
+        error?.message;
+      setAskError(message || "failed to ask AI");
+    } finally {
+      setAskLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen p-6 gap-y-6 flex flex-col justify-start w-full">
@@ -41,6 +75,44 @@ export default function Home() {
         >
           Admin Section
         </button>
+      </section>
+      <section>
+        <div>Ask AI about users</div>
+        {authLoading ? (
+          <div>Checking login...</div>
+        ) : user ? (
+          <form onSubmit={askAi}>
+            <input
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="e.g. Who are admins?"
+            />
+            <button type="submit" disabled={askLoading}>
+              {askLoading ? "Asking..." : "Ask"}
+            </button>
+          </form>
+        ) : (
+          <div>Please login to use the AI feature</div>
+        )}
+        {askError ? <div>{askError}</div> : null}
+        {askResult ? (
+          <div>
+            <div>Answer</div>
+            <div>{askResult.answer || "(no answer)"}</div>
+            <div>Sources</div>
+            {Array.isArray(askResult.sources) && askResult.sources.length ? (
+              <ul>
+                {askResult.sources.map((s) => {
+                  <li key={s._id}>
+                    {s.username} ({s.role}) - {s.email}
+                  </li>;
+                })}
+              </ul>
+            ) : (
+              <div>No sources found.</div>
+            )}
+          </div>
+        ) : null}
       </section>
       <section className="w-full flex justify-center gap-x-3">
         {view === "user" ? (
